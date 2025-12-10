@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Part 4 - 進階功能：公式與圖表</title>
+    <style>
+        /* 基礎設定 */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft JhengHei', 'Segoe UI', Arial, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            min-height: 100vh;
+            overflow: hidden;
+            color: #333;
+        }
+
+        /* === 導航列 === */
+        .nav-bar {
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            height: 60px;
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 30px;
+            z-index: 10000;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .nav-title {
+            font-size: 22px;
+            font-weight: 700;
+            color: #fff;
+            letter-spacing: 1px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .nav-buttons { display: flex; gap: 12px; }
+
+        .nav-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            color: white;
+            padding: 6px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .nav-btn:hover {
+            background: rgba(255, 255, 255, 0.4);
+            transform: translateY(-2px);
+        }
+
+        /* === 導航箭頭 === */
+        .nav-arrow {
+            position: fixed;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(255,255,255,0.25);
+            color: white;
+            width: 60px; height: 60px;
+            border-radius: 50%;
+            border: 2px solid rgba(255,255,255,0.4);
+            font-size: 24px;
+            cursor: pointer;
+            z-index: 9000;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .nav-arrow:hover {
+            background: rgba(255,255,255,0.5);
+            transform: translateY(-50%) scale(1.1);
+        }
+        .prev-arrow { left: 30px; }
+        .next-arrow { right: 30px; }
+        .nav-arrow:disabled { opacity: 0.3; cursor: not-allowed; }
+
+        /* === 投影片容器 === */
+        .slide-container {
+            width: 100%;
+            height: 100vh;
+            padding-top: 60px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .slide {
+            position: absolute;
+            top: 60px; left: 0;
+            width: 100%;
+            height: calc(100vh - 60px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+            opacity: 0;
+            transition: opacity 0.4s ease;
+            z-index: 10;
+        }
+
+        .slide.active {
+            display: flex;
+            opacity: 1;
+            z-index: 20;
+        }
+
+        /* === 內容卡片 === */
+        .content-card {
+            background: rgba(255, 255, 255, 0.98);
+            border-radius: 24px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+            padding: 60px;
+            max-width: 1400px;
+            width: 95%;
+            max-height: 88vh;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        /* 其他通用樣式 */
+        h1 { color: #1e3c72; font-size: 56px; margin-bottom: 24px; text-align: center; }
+        h2 { color: #2a5298; font-size: 38px; margin-bottom: 35px; border-bottom: 3px solid #1e3c72; padding-bottom: 12px; }
+        h3 { color: #1e3c72; font-size: 26px; margin: 30px 0 15px 0; }
+        h4 { color: #2a5298; font-size: 22px; margin: 20px 0 10px 0; }
+        p, li { font-size: 20px; line-height: 1.8; color: #444; margin-bottom: 15px; }
+        code { background: #f0f2f5; padding: 3px 8px; border-radius: 6px; font-family: 'Consolas', monospace; color: #d63384; font-weight: 600; font-size: 0.95em; }
+        pre { background: #282c34; color: #abb2bf; padding: 25px; border-radius: 12px; overflow-x: auto; margin: 25px 0; font-size: 18px; line-height: 1.6; font-family: 'Consolas', monospace; }
+        pre code { background: none; color: #abb2bf; padding: 0; }
+
+        .box { padding: 25px; border-radius: 12px; margin: 25px 0; border-left: 6px solid; font-size: 18px; }
+        .info { background: #e3f2fd; border-color: #2196f3; color: #0d47a1; }
+        .warning { background: #fff3cd; border-color: #ffc107; color: #856404; }
+        .success { background: #d4edda; border-color: #28a745; color: #155724; }
+        .danger { background: #f8d7da; border-color: #dc3545; color: #721c24; }
+        .tip { background: #f3e5f5; border-color: #9c27b0; color: #4a148c; }
+        .highlight { background: linear-gradient(120deg, #84fab0 0%, #8fd3f4 100%); padding: 2px 6px; border-radius: 4px; font-weight: bold; color: #004d40; }
+
+        .step-container { background: #f8f9fa; border-radius: 15px; padding: 30px; margin: 25px 0; border: 2px solid #e9ecef; }
+        .step-number { display: inline-block; background: linear-gradient(135deg, #1e3c72, #2a5298); color: white; width: 36px; height: 36px; border-radius: 50%; text-align: center; line-height: 36px; font-weight: bold; margin-right: 15px; }
+        .step-title { font-size: 22px; font-weight: bold; color: #1e3c72; display: inline; }
+        .step-content { margin-top: 15px; padding-left: 51px; }
+
+        .concept-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 25px; margin-top: 30px; }
+        .concept-card { background: #f8f9fa; padding: 25px; border-radius: 15px; border: 1px solid #e9ecef; transition: transform 0.3s; }
+        .concept-card:hover { transform: translateY(-8px); border-color: #4facfe; }
+
+        .file-icon { font-size: 48px; text-align: center; margin-bottom: 15px; }
+
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { padding: 15px; text-align: left; border-bottom: 1px solid #e9ecef; }
+        th { background: #f8f9fa; color: #1e3c72; font-weight: 700; }
+        tr:hover { background: #f8f9fa; }
+
+        .indicators { position: fixed; bottom: 25px; left: 50%; transform: translateX(-50%); display: flex; gap: 12px; z-index: 4000; padding: 10px 25px; background: rgba(0,0,0,0.3); border-radius: 30px; backdrop-filter: blur(5px); }
+        .dot { width: 12px; height: 12px; background: rgba(255,255,255,0.4); border-radius: 50%; cursor: pointer; transition: all 0.3s; }
+        .dot.active { background: #4facfe; transform: scale(1.3); }
+
+        .math-demo { background: #f8f9fa; padding: 20px; border-radius: 10px; text-align: center; font-size: 24px; margin: 15px 0; font-family: 'Times New Roman', serif; }
+        .formula-box { display: flex; gap: 30px; align-items: center; margin: 20px 0; }
+        .formula-input { flex: 1; }
+        .formula-output { flex: 1; background: #e8f5e9; padding: 20px; border-radius: 10px; text-align: center; }
+
+        .mermaid-example { background: #f0f7ff; border: 2px solid #2196f3; border-radius: 10px; padding: 20px; margin: 15px 0; }
+    </style>
+</head>
+<body>
+
+    <!-- 導航列 -->
+    <div class="nav-bar">
+        <div class="nav-title">Part 4 - 進階功能：公式與圖表</div>
+        <div class="nav-buttons">
+            <a href="Pandoc教學_統整頁.html" class="nav-btn">📚 回到目錄</a>
+            <a href="Pandoc教學_Part3_PDF與中文字型.html" class="nav-btn">⬅️ Part 3</a>
+            <a href="Pandoc教學_Part5_自動化腳本.html" class="nav-btn">Part 5 ➡️</a>
+            <button class="nav-btn" onclick="toggleFullscreen()">🖥️ 全螢幕</button>
+            <a href="https://mermaid.js.org/" target="_blank" class="nav-btn">📊 Mermaid.js</a>
+            <a href="https://katex.org/" target="_blank" class="nav-btn">📐 KaTeX</a>
+        </div>
+    </div>
+
+    <!-- 投影片內容 -->
+    <div class="slide-container">
+
+        <!-- Slide 1: 封面 -->
+        <div class="slide active">
+            <div class="content-card" style="text-align: center; display: flex; flex-direction: column; justify-content: center; align-items: center;">
+                <h4 style="color: #4facfe; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 10px;">Pandoc 文件轉換大師</h4>
+                <h1>Part 4: 進階功能</h1>
+                <h2 style="border: none; font-weight: normal; font-size: 28px; color: #666; max-width: 800px;">
+                    LaTeX 數學公式、圖片插入、Mermaid 圖表整合
+                </h2>
+                <div style="margin-top: 40px; display: flex; gap: 20px; flex-wrap: wrap; justify-content: center;">
+                    <span class="highlight">📐 數學公式</span>
+                    <span class="highlight">🖼️ 圖片處理</span>
+                    <span class="highlight">📊 Mermaid 圖表</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 2: 學習目標 -->
+        <div class="slide">
+            <div class="content-card">
+                <h2>🎯 本單元學習目標</h2>
+                <p>學完這個單元，你的文件將能包含：</p>
+                <div class="concept-grid">
+                    <div class="concept-card">
+                        <div class="file-icon">📐</div>
+                        <h3>數學公式</h3>
+                        <p>使用 LaTeX 語法撰寫數學方程式，適合學術報告、教學文件</p>
+                    </div>
+                    <div class="concept-card">
+                        <div class="file-icon">🖼️</div>
+                        <h3>圖片與圖說</h3>
+                        <p>正確插入圖片、調整大小、加上圖片說明</p>
+                    </div>
+                    <div class="concept-card">
+                        <div class="file-icon">📊</div>
+                        <h3>Mermaid 圖表</h3>
+                        <p>用文字語法畫出流程圖、時序圖、架構圖</p>
+                    </div>
+                    <div class="concept-card">
+                        <div class="file-icon">📋</div>
+                        <h3>表格</h3>
+                        <p>在 Markdown 中建立整齊的表格</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 3: LaTeX 公式基礎 -->
+        <div class="slide">
+            <div class="content-card">
+                <h2>📐 LaTeX 數學公式基礎</h2>
+                <p>Pandoc 支援 LaTeX 數學語法，讓你可以在文件中插入精美的數學公式。</p>
+
+                <h3>兩種公式類型</h3>
+                <table>
+                    <tr>
+                        <th>類型</th>
+                        <th>語法</th>
+                        <th>效果</th>
+                    </tr>
+                    <tr>
+                        <td><strong>行內公式</strong></td>
+                        <td><code>$E = mc^2$</code></td>
+                        <td>公式與文字在同一行：E = mc²</td>
+                    </tr>
+                    <tr>
+                        <td><strong>獨立公式</strong></td>
+                        <td><code>$$E = mc^2$$</code></td>
+                        <td>公式獨占一行，置中顯示</td>
+                    </tr>
+                </table>
+
+                <h3>Markdown 範例</h3>
+                <pre><code>愛因斯坦的質能方程式 $E = mc^2$ 說明了質量與能量的關係。
+
+完整的方程式如下：
+
+$$
+E = mc^2
+$$
+
+其中 $E$ 是能量，$m$ 是質量，$c$ 是光速。</code></pre>
+            </div>
+        </div>
+
+        <!-- Slide 4: 常用數學符號 -->
+        <div class="slide">
+            <div class="content-card">
+                <h2>🔢 常用數學符號對照表</h2>
+                <p>以下是撰寫數學公式時最常用的 LaTeX 符號：</p>
+
+                <table>
+                    <tr>
+                        <th>效果</th>
+                        <th>LaTeX 語法</th>
+                        <th>說明</th>
+                    </tr>
+                    <tr>
+                        <td>x²</td>
+                        <td><code>x^2</code></td>
+                        <td>上標（次方）</td>
+                    </tr>
+                    <tr>
+                        <td>x₂</td>
+                        <td><code>x_2</code></td>
+                        <td>下標</td>
+                    </tr>
+                    <tr>
+                        <td>分數 ½</td>
+                        <td><code>\frac{1}{2}</code></td>
+                        <td>分數</td>
+                    </tr>
+                    <tr>
+                        <td>√x</td>
+                        <td><code>\sqrt{x}</code></td>
+                        <td>平方根</td>
+                    </tr>
+                    <tr>
+                        <td>∑</td>
+                        <td><code>\sum_{i=1}^{n}</code></td>
+                        <td>求和符號</td>
+                    </tr>
+                    <tr>
+                        <td>∫</td>
+                        <td><code>\int_{a}^{b}</code></td>
+                        <td>積分符號</td>
+                    </tr>
+                    <tr>
+                        <td>α, β, γ</td>
+                        <td><code>\alpha, \beta, \gamma</code></td>
+                        <td>希臘字母</td>
+                    </tr>
+                    <tr>
+                        <td>≤, ≥, ≠</td>
+                        <td><code>\leq, \geq, \neq</code></td>
+                        <td>比較符號</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+
+        <!-- Slide 5: 數學公式實例 -->
+        <div class="slide">
+            <div class="content-card">
+                <h2>📝 數學公式實例</h2>
+
+                <h3>範例 1：二次方程式</h3>
+                <div class="formula-box">
+                    <div class="formula-input">
+                        <pre><code>$$x = \frac{-b \pm \sqrt{b^2-4ac}}{2a}$$</code></pre>
+                    </div>
+                    <div class="formula-output">
+                        <p style="font-size: 14px; color: #666;">輸出效果（在 PDF 中）</p>
+                        <div class="math-demo">x = (-b ± √(b²-4ac)) / 2a</div>
+                    </div>
+                </div>
+
+                <h3>範例 2：求和公式</h3>
+                <div class="formula-box">
+                    <div class="formula-input">
+                        <pre><code>$$\sum_{i=1}^{n} i = \frac{n(n+1)}{2}$$</code></pre>
+                    </div>
+                    <div class="formula-output">
+                        <div class="math-demo">Σ(i=1 到 n) i = n(n+1)/2</div>
+                    </div>
+                </div>
+
+                <h3>範例 3：積分</h3>
+                <div class="formula-box">
+                    <div class="formula-input">
+                        <pre><code>$$\int_{0}^{\infty} e^{-x^2} dx = \frac{\sqrt{\pi}}{2}$$</code></pre>
+                    </div>
+                    <div class="formula-output">
+                        <div class="math-demo">∫(0 到 ∞) e^(-x²) dx = √π/2</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 6: HTML 輸出時的公式處理 -->
+        <div class="slide">
+            <div class="content-card">
+                <h2>🌐 HTML 輸出：使用 MathJax 渲染公式</h2>
+                <p>在轉換成 HTML 時，需要加上 <code>--mathjax</code> 參數，讓瀏覽器能正確顯示數學公式。</p>
+
+                <h3>轉換指令</h3>
+                <pre><code>pandoc input.md -o output.html -s --mathjax</code></pre>
+
+                <div class="box info">
+                    <strong>📌 什麼是 MathJax？</strong><br>
+                    MathJax 是一個 JavaScript 函式庫，可以在網頁中渲染 LaTeX 數學公式。<br>
+                    加上 <code>--mathjax</code> 後，Pandoc 會自動在 HTML 中引入 MathJax CDN。
+                </div>
+
+                <h3>另一個選擇：KaTeX</h3>
+                <pre><code>pandoc input.md -o output.html -s --katex</code></pre>
+                <p>KaTeX 是另一個數學渲染引擎，速度比 MathJax 快，但支援的 LaTeX 語法較少。</p>
+
+                <table>
+                    <tr>
+                        <th>選項</th>
+                        <th>優點</th>
+                        <th>缺點</th>
+                    </tr>
+                    <tr>
+                        <td><code>--mathjax</code></td>
+                        <td>支援完整 LaTeX 語法</td>
+                        <td>載入較慢</td>
+                    </tr>
+                    <tr>
+                        <td><code>--katex</code></td>
+                        <td>渲染速度快</td>
+                        <td>部分語法不支援</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+
+        <!-- Slide 7: 圖片插入基礎 -->
+        <div class="slide">
+            <div class="content-card">
+                <h2>🖼️ 圖片插入基礎</h2>
+                <p>在 Markdown 中插入圖片的基本語法：</p>
+
+                <h3>基本語法</h3>
+                <pre><code>![圖片說明文字](圖片路徑)</code></pre>
+
+                <h3>實際範例</h3>
+                <pre><code>![Pandoc Logo](images/pandoc-logo.png)
+
+![系統架構圖](./diagrams/architecture.jpg "系統架構說明")</code></pre>
+
+                <table>
+                    <tr>
+                        <th>部分</th>
+                        <th>說明</th>
+                    </tr>
+                    <tr>
+                        <td><code>![...]</code></td>
+                        <td>替代文字（Alt text），圖片無法顯示時會出現</td>
+                    </tr>
+                    <tr>
+                        <td><code>(...)</code></td>
+                        <td>圖片路徑（可以是相對路徑或絕對路徑）</td>
+                    </tr>
+                    <tr>
+                        <td><code>"..."</code></td>
+                        <td>（可選）圖片標題</td>
+                    </tr>
+                </table>
+
+                <div class="box warning">
+                    <strong>⚠️ 路徑注意事項：</strong><br>
+                    圖片路徑是相對於 Markdown 檔案的位置！<br>
+                    建議將圖片放在與 Markdown 同一資料夾，或建立 <code>images</code> 子資料夾。
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 8: 調整圖片大小 -->
+        <div class="slide">
+            <div class="content-card">
+                <h2>📏 調整圖片大小與樣式</h2>
+                <p>Pandoc 擴充語法允許你設定圖片的寬度、高度等屬性。</p>
+
+                <h3>設定寬度</h3>
+                <pre><code>![圖片說明](image.png){ width=50% }
+
+![另一張圖](photo.jpg){ width=300px }
+
+![指定寬高](diagram.png){ width=10cm height=8cm }</code></pre>
+
+                <h3>常用單位</h3>
+                <table>
+                    <tr>
+                        <th>單位</th>
+                        <th>說明</th>
+                        <th>範例</th>
+                    </tr>
+                    <tr>
+                        <td><code>%</code></td>
+                        <td>相對於頁面寬度的百分比</td>
+                        <td><code>width=50%</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>px</code></td>
+                        <td>像素（適合螢幕顯示）</td>
+                        <td><code>width=400px</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>cm</code></td>
+                        <td>公分（適合印刷）</td>
+                        <td><code>width=10cm</code></td>
+                    </tr>
+                </table>
+
+                <div class="box tip">
+                    <strong>💡 建議：</strong>PDF 輸出時用 <code>%</code> 或 <code>cm</code>，HTML 輸出時用 <code>%</code> 或 <code>px</code>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 9: 圖片與圖說 -->
+        <div class="slide">
+            <div class="content-card">
+                <h2>📋 圖片標題（Figure Caption）</h2>
+                <p>如果圖片語法<strong>獨立成一段</strong>（前後都有空行），Pandoc 會將 Alt 文字變成圖片標題。</p>
+
+                <h3>有圖說的寫法</h3>
+                <pre><code>這是一段文字。
+
+![圖1：系統架構圖](architecture.png)
+
+這是另一段文字。</code></pre>
+
+                <h3>輸出效果</h3>
+                <ul>
+                    <li><strong>PDF：</strong>圖片下方會顯示「圖1：系統架構圖」</li>
+                    <li><strong>HTML：</strong>生成 <code>&lt;figure&gt;</code> 和 <code>&lt;figcaption&gt;</code> 標籤</li>
+                    <li><strong>Word：</strong>圖片會有標題文字</li>
+                </ul>
+
+                <h3>無圖說的寫法（行內圖片）</h3>
+                <pre><code>這是 ![小圖示](icon.png){ width=20px } 行內的圖片。</code></pre>
+
+                <div class="box info">
+                    <strong>📌 差別：</strong>行內圖片不會產生圖說，適合小圖示或 emoji 圖片。
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 10: 表格基礎 -->
+        <div class="slide">
+            <div class="content-card">
+                <h2>📊 Markdown 表格</h2>
+                <p>Markdown 支援使用管線符號 <code>|</code> 建立表格。</p>
+
+                <h3>基本語法</h3>
+                <pre><code>| 欄位1 | 欄位2 | 欄位3 |
+|-------|-------|-------|
+| 資料1 | 資料2 | 資料3 |
+| 資料4 | 資料5 | 資料6 |</code></pre>
+
+                <h3>設定對齊方式</h3>
+                <pre><code>| 左對齊 | 置中 | 右對齊 |
+|:-------|:------:|-------:|
+| 文字   | 文字   | 數字   |
+| AAA    | BBB    | 123    |</code></pre>
+
+                <table>
+                    <tr>
+                        <th>語法</th>
+                        <th>對齊方式</th>
+                    </tr>
+                    <tr>
+                        <td><code>:---</code></td>
+                        <td>左對齊</td>
+                    </tr>
+                    <tr>
+                        <td><code>:---:</code></td>
+                        <td>置中</td>
+                    </tr>
+                    <tr>
+                        <td><code>---:</code></td>
+                        <td>右對齊</td>
+                    </tr>
+                </table>
+
+                <h3>加上表格標題</h3>
+                <pre><code>Table: 各季度銷售數據
+
+| 季度 | 銷售額 | 成長率 |
+|------|-------:|-------:|
+| Q1   | 100萬  | 10%    |
+| Q2   | 120萬  | 20%    |</code></pre>
+            </div>
+        </div>
+
+        <!-- Slide 11: Mermaid 圖表介紹 -->
+        <div class="slide">
+            <div class="content-card">
+                <h2>📊 Mermaid 圖表介紹</h2>
+                <p>Mermaid 是一個用<strong>文字語法</strong>繪製圖表的工具。不用畫圖軟體，純文字就能產生專業圖表！</p>
+
+                <div class="concept-grid">
+                    <div class="concept-card">
+                        <h3>流程圖 (Flowchart)</h3>
+                        <p>適合：工作流程、決策流程</p>
+                    </div>
+                    <div class="concept-card">
+                        <h3>時序圖 (Sequence)</h3>
+                        <p>適合：API 呼叫、系統互動</p>
+                    </div>
+                    <div class="concept-card">
+                        <h3>類別圖 (Class)</h3>
+                        <p>適合：程式架構、UML</p>
+                    </div>
+                    <div class="concept-card">
+                        <h3>甘特圖 (Gantt)</h3>
+                        <p>適合：專案時程、排程</p>
+                    </div>
+                </div>
+
+                <div class="box info">
+                    <strong>📌 優點：</strong>
+                    <ul>
+                        <li>圖表即程式碼，可以用 Git 版本控制</li>
+                        <li>修改方便，不用重畫整張圖</li>
+                        <li>支援多種圖表類型</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 12: Mermaid 流程圖語法 -->
+        <div class="slide">
+            <div class="content-card">
+                <h2>📝 Mermaid 流程圖語法</h2>
+
+                <h3>基本結構</h3>
+                <div class="mermaid-example">
+                    <pre><code>```mermaid
+graph TD
+    A[開始] --> B{判斷條件}
+    B -->|是| C[執行動作1]
+    B -->|否| D[執行動作2]
+    C --> E[結束]
+    D --> E
+```</code></pre>
+                </div>
+
+                <h3>方向設定</h3>
+                <table>
+                    <tr>
+                        <th>代碼</th>
+                        <th>方向</th>
+                    </tr>
+                    <tr>
+                        <td><code>TD</code> 或 <code>TB</code></td>
+                        <td>由上到下 (Top-Down)</td>
+                    </tr>
+                    <tr>
+                        <td><code>LR</code></td>
+                        <td>由左到右 (Left-Right)</td>
+                    </tr>
+                    <tr>
+                        <td><code>BT</code></td>
+                        <td>由下到上 (Bottom-Top)</td>
+                    </tr>
+                    <tr>
+                        <td><code>RL</code></td>
+                        <td>由右到左 (Right-Left)</td>
+                    </tr>
+                </table>
+
+                <h3>節點形狀</h3>
+                <ul>
+                    <li><code>[方形]</code> - 一般步驟</li>
+                    <li><code>{菱形}</code> - 判斷/決策</li>
+                    <li><code>((圓形))</code> - 開始/結束</li>
+                    <li><code>([圓角方形])</code> - 一般步驟</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Slide 13: 安裝 Mermaid Filter -->
+        <div class="slide">
+            <div class="content-card">
+                <h2>⚙️ 安裝 Mermaid Filter（PDF 輸出用）</h2>
+                <p>要讓 Pandoc 將 Mermaid 圖表轉成 PDF，需要安裝專用的濾器。</p>
+
+                <div class="step-container">
+                    <span class="step-number">1</span>
+                    <span class="step-title">安裝 Node.js</span>
+                    <div class="step-content">
+                        <p>前往 <a href="https://nodejs.org/" target="_blank">nodejs.org</a> 下載並安裝 Node.js（選 LTS 版本）</p>
+                        <p>驗證安裝：</p>
+                        <pre><code>node --version
+npm --version</code></pre>
+                    </div>
+                </div>
+
+                <div class="step-container">
+                    <span class="step-number">2</span>
+                    <span class="step-title">安裝 mermaid-filter</span>
+                    <div class="step-content">
+                        <pre><code>npm install -g mermaid-filter</code></pre>
+                    </div>
+                </div>
+
+                <div class="step-container">
+                    <span class="step-number">3</span>
+                    <span class="step-title">使用濾器轉換</span>
+                    <div class="step-content">
+                        <pre><code>pandoc input.md -o output.pdf --pdf-engine=xelatex -F mermaid-filter</code></pre>
+                        <p><strong>Windows 用戶注意：</strong>可能需要使用 <code>-F mermaid-filter.cmd</code></p>
+                    </div>
+                </div>
+
+                <div class="box warning">
+                    <strong>⚠️ 注意：</strong>第一次執行可能需要較長時間，因為需要下載相依套件。
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 14: HTML 輸出 Mermaid -->
+        <div class="slide">
+            <div class="content-card">
+                <h2>🌐 HTML 輸出：直接使用 Mermaid.js</h2>
+                <p>如果只需要輸出 HTML，可以直接讓瀏覽器渲染 Mermaid，不需要安裝濾器。</p>
+
+                <h3>方法：建立自訂 HTML 模板</h3>
+                <p>建立一個檔案 <code>template.html</code>：</p>
+
+                <pre><code>&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+&lt;head&gt;
+    &lt;meta charset="UTF-8"&gt;
+    &lt;title&gt;$title$&lt;/title&gt;
+    &lt;script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"&gt;&lt;/script&gt;
+    &lt;script&gt;mermaid.initialize({startOnLoad:true});&lt;/script&gt;
+&lt;/head&gt;
+&lt;body&gt;
+$body$
+&lt;/body&gt;
+&lt;/html&gt;</code></pre>
+
+                <h3>轉換指令</h3>
+                <pre><code>pandoc input.md -o output.html --template=template.html</code></pre>
+
+                <div class="box tip">
+                    <strong>💡 簡易替代方案：</strong><br>
+                    如果不想建立模板，可以用 <code>--embed-resources</code> 轉換後，手動在 HTML 的 <code>&lt;head&gt;</code> 區塊加入 Mermaid 腳本。
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 15: 綜合範例 -->
+        <div class="slide">
+            <div class="content-card">
+                <h2>📄 綜合範例：完整文件</h2>
+                <p>以下是一個包含公式、圖片、表格的完整 Markdown 範例：</p>
+
+                <pre style="font-size: 14px;"><code>---
+title: "系統設計文件"
+author: "開發團隊"
+CJKmainfont: "Microsoft JhengHei"
+---
+
+# 專案簡介
+
+本專案採用微服務架構，主要公式為 $E = mc^2$。
+
+## 系統架構
+
+![系統架構圖](architecture.png){ width=80% }
+
+## 效能分析
+
+響應時間公式：
+
+$$T = T_{network} + T_{processing} + T_{db}$$
+
+## 測試結果
+
+| 測試項目 | 結果 | 備註 |
+|---------|:----:|------|
+| 單元測試 | 通過 | 100% |
+| 整合測試 | 通過 | 98%  |
+
+## 流程圖
+
+```mermaid
+graph LR
+    A[用戶] --> B[API Gateway]
+    B --> C[Service A]
+    B --> D[Service B]
+```</code></pre>
+            </div>
+        </div>
+
+        <!-- Slide 16: 總結 -->
+        <div class="slide">
+            <div class="content-card">
+                <h2>🎉 Part 4 總結</h2>
+                <p>恭喜！你已經學會在文件中加入進階元素了！</p>
+
+                <div class="concept-grid">
+                    <div class="concept-card">
+                        <h3>✅ 數學公式</h3>
+                        <ul>
+                            <li>行內：<code>$...$</code></li>
+                            <li>獨立：<code>$$...$$</code></li>
+                            <li>HTML 用 <code>--mathjax</code></li>
+                        </ul>
+                    </div>
+                    <div class="concept-card">
+                        <h3>✅ 圖片處理</h3>
+                        <ul>
+                            <li><code>![alt](path)</code></li>
+                            <li><code>{ width=50% }</code></li>
+                            <li>獨立段落 = 有圖說</li>
+                        </ul>
+                    </div>
+                    <div class="concept-card">
+                        <h3>✅ 表格</h3>
+                        <ul>
+                            <li>用 <code>|</code> 分隔欄位</li>
+                            <li><code>:---:</code> 設定對齊</li>
+                            <li><code>Table:</code> 加標題</li>
+                        </ul>
+                    </div>
+                    <div class="concept-card">
+                        <h3>✅ Mermaid 圖表</h3>
+                        <ul>
+                            <li>PDF：<code>-F mermaid-filter</code></li>
+                            <li>HTML：載入 Mermaid.js</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="box info" style="margin-top: 30px;">
+                    <h3>📚 下一步：Part 5</h3>
+                    <p>學習<strong>批次檔與 PowerShell 腳本</strong>，一鍵完成多格式轉換！<br>
+                    不用每次都手動輸入指令，自動化讓工作效率翻倍。</p>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- 導航箭頭 -->
+    <button class="nav-arrow prev-arrow" id="prevBtn" onclick="changeSlide(-1)">❮</button>
+    <button class="nav-arrow next-arrow" id="nextBtn" onclick="changeSlide(1)">❯</button>
+
+    <!-- 頁碼指示器 -->
+    <div class="indicators" id="indicatorContainer"></div>
+
+    <script>
+        let currentSlide = 0;
+        const slides = document.querySelectorAll('.slide');
+        const totalSlides = slides.length;
+
+        function init() {
+            createIndicators();
+            showSlide(0);
+            updateButtons();
+            document.addEventListener('keydown', handleKeydown);
+        }
+
+        function handleKeydown(e) {
+            if (e.key === 'ArrowLeft') changeSlide(-1);
+            if (e.key === 'ArrowRight') changeSlide(1);
+        }
+
+        function createIndicators() {
+            const container = document.getElementById('indicatorContainer');
+            container.innerHTML = '';
+            slides.forEach((_, index) => {
+                const dot = document.createElement('div');
+                dot.className = 'dot';
+                dot.onclick = () => goToSlide(index);
+                container.appendChild(dot);
+            });
+        }
+
+        function showSlide(index) {
+            if (index < 0) index = 0;
+            if (index >= totalSlides) index = totalSlides - 1;
+
+            slides.forEach(slide => slide.classList.remove('active'));
+            slides[index].classList.add('active');
+            currentSlide = index;
+
+            const dots = document.querySelectorAll('.dot');
+            dots.forEach((dot, idx) => {
+                dot.classList.toggle('active', idx === index);
+            });
+
+            updateButtons();
+        }
+
+        function changeSlide(direction) {
+            showSlide(currentSlide + direction);
+        }
+
+        function goToSlide(index) {
+            showSlide(index);
+        }
+
+        function updateButtons() {
+            document.getElementById('prevBtn').disabled = currentSlide === 0;
+            document.getElementById('nextBtn').disabled = currentSlide === totalSlides - 1;
+        }
+
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen();
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                }
+            }
+        }
+
+        init();
+    </script>
+</body>
+</html>

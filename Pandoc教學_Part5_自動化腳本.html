@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Part 5 - 自動化批次腳本</title>
+    <style>
+        /* 基礎設定 */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft JhengHei', 'Segoe UI', Arial, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            min-height: 100vh;
+            overflow: hidden;
+            color: #333;
+        }
+
+        /* === 導航列 === */
+        .nav-bar {
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            height: 60px;
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 30px;
+            z-index: 10000;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .nav-title {
+            font-size: 22px;
+            font-weight: 700;
+            color: #fff;
+            letter-spacing: 1px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .nav-buttons { display: flex; gap: 12px; }
+
+        .nav-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            color: white;
+            padding: 6px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .nav-btn:hover {
+            background: rgba(255, 255, 255, 0.4);
+            transform: translateY(-2px);
+        }
+
+        /* === 導航箭頭 === */
+        .nav-arrow {
+            position: fixed;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(255,255,255,0.25);
+            color: white;
+            width: 60px; height: 60px;
+            border-radius: 50%;
+            border: 2px solid rgba(255,255,255,0.4);
+            font-size: 24px;
+            cursor: pointer;
+            z-index: 9000;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .nav-arrow:hover {
+            background: rgba(255,255,255,0.5);
+            transform: translateY(-50%) scale(1.1);
+        }
+        .prev-arrow { left: 30px; }
+        .next-arrow { right: 30px; }
+        .nav-arrow:disabled { opacity: 0.3; cursor: not-allowed; }
+
+        /* === 投影片容器 === */
+        .slide-container {
+            width: 100%;
+            height: 100vh;
+            padding-top: 60px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .slide {
+            position: absolute;
+            top: 60px; left: 0;
+            width: 100%;
+            height: calc(100vh - 60px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+            opacity: 0;
+            transition: opacity 0.4s ease;
+            z-index: 10;
+        }
+
+        .slide.active {
+            display: flex;
+            opacity: 1;
+            z-index: 20;
+        }
+
+        /* === 內容卡片 === */
+        .content-card {
+            background: rgba(255, 255, 255, 0.98);
+            border-radius: 24px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+            padding: 60px;
+            max-width: 1400px;
+            width: 95%;
+            max-height: 88vh;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        /* 其他通用樣式 */
+        h1 { color: #1e3c72; font-size: 56px; margin-bottom: 24px; text-align: center; }
+        h2 { color: #2a5298; font-size: 38px; margin-bottom: 35px; border-bottom: 3px solid #1e3c72; padding-bottom: 12px; }
+        h3 { color: #1e3c72; font-size: 26px; margin: 30px 0 15px 0; }
+        h4 { color: #2a5298; font-size: 22px; margin: 20px 0 10px 0; }
+        p, li { font-size: 20px; line-height: 1.8; color: #444; margin-bottom: 15px; }
+        code { background: #f0f2f5; padding: 3px 8px; border-radius: 6px; font-family: 'Consolas', monospace; color: #d63384; font-weight: 600; font-size: 0.95em; }
+        pre { background: #282c34; color: #abb2bf; padding: 25px; border-radius: 12px; overflow-x: auto; margin: 25px 0; font-size: 16px; line-height: 1.6; font-family: 'Consolas', monospace; }
+        pre code { background: none; color: #abb2bf; padding: 0; }
+
+        .box { padding: 25px; border-radius: 12px; margin: 25px 0; border-left: 6px solid; font-size: 18px; }
+        .info { background: #e3f2fd; border-color: #2196f3; color: #0d47a1; }
+        .warning { background: #fff3cd; border-color: #ffc107; color: #856404; }
+        .success { background: #d4edda; border-color: #28a745; color: #155724; }
+        .danger { background: #f8d7da; border-color: #dc3545; color: #721c24; }
+        .tip { background: #f3e5f5; border-color: #9c27b0; color: #4a148c; }
+        .highlight { background: linear-gradient(120deg, #84fab0 0%, #8fd3f4 100%); padding: 2px 6px; border-radius: 4px; font-weight: bold; color: #004d40; }
+
+        .step-container { background: #f8f9fa; border-radius: 15px; padding: 30px; margin: 25px 0; border: 2px solid #e9ecef; }
+        .step-number { display: inline-block; background: linear-gradient(135deg, #1e3c72, #2a5298); color: white; width: 36px; height: 36px; border-radius: 50%; text-align: center; line-height: 36px; font-weight: bold; margin-right: 15px; }
+        .step-title { font-size: 22px; font-weight: bold; color: #1e3c72; display: inline; }
+        .step-content { margin-top: 15px; padding-left: 51px; }
+
+        .concept-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 25px; margin-top: 30px; }
+        .concept-card { background: #f8f9fa; padding: 25px; border-radius: 15px; border: 1px solid #e9ecef; transition: transform 0.3s; }
+        .concept-card:hover { transform: translateY(-8px); border-color: #4facfe; }
+
+        .file-icon { font-size: 48px; text-align: center; margin-bottom: 15px; }
+
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { padding: 15px; text-align: left; border-bottom: 1px solid #e9ecef; }
+        th { background: #f8f9fa; color: #1e3c72; font-weight: 700; }
+        tr:hover { background: #f8f9fa; }
+
+        .indicators { position: fixed; bottom: 25px; left: 50%; transform: translateX(-50%); display: flex; gap: 12px; z-index: 4000; padding: 10px 25px; background: rgba(0,0,0,0.3); border-radius: 30px; backdrop-filter: blur(5px); }
+        .dot { width: 12px; height: 12px; background: rgba(255,255,255,0.4); border-radius: 50%; cursor: pointer; transition: all 0.3s; }
+        .dot.active { background: #4facfe; transform: scale(1.3); }
+
+        .code-comment { color: #6a9955; }
+        .code-keyword { color: #569cd6; }
+        .code-string { color: #ce9178; }
+        .code-variable { color: #9cdcfe; }
+
+        .script-box { background: #1e1e1e; border-radius: 15px; padding: 30px; margin: 20px 0; }
+        .script-header { display: flex; align-items: center; gap: 10px; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #444; }
+        .script-icon { font-size: 24px; }
+        .script-name { color: #fff; font-weight: bold; font-size: 18px; }
+        .script-type { color: #888; font-size: 14px; }
+    </style>
+</head>
+<body>
+
+    <!-- 導航列 -->
+    <div class="nav-bar">
+        <div class="nav-title">Part 5 - 自動化批次腳本</div>
+        <div class="nav-buttons">
+            <a href="Pandoc教學_統整頁.html" class="nav-btn">📚 回到目錄</a>
+            <a href="Pandoc教學_Part4_進階功能.html" class="nav-btn">⬅️ Part 4</a>
+            <button class="nav-btn" onclick="toggleFullscreen()">🖥️ 全螢幕</button>
+            <a href="https://pandoc.org/" target="_blank" class="nav-btn">📄 Pandoc 官網</a>
+            <a href="https://nodejs.org/" target="_blank" class="nav-btn">📦 Node.js</a>
+        </div>
+    </div>
+
+    <!-- 投影片內容 -->
+    <div class="slide-container">
+
+        <!-- Slide 1: 封面 -->
+        <div class="slide active">
+            <div class="content-card" style="text-align: center; display: flex; flex-direction: column; justify-content: center; align-items: center;">
+                <h4 style="color: #4facfe; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 10px;">Pandoc 文件轉換大師</h4>
+                <h1>Part 5: 自動化批次腳本</h1>
+                <h2 style="border: none; font-weight: normal; font-size: 28px; color: #666; max-width: 800px;">
+                    批次檔與 PowerShell 腳本，一鍵完成多格式轉換
+                </h2>
+                <div style="margin-top: 40px; display: flex; gap: 20px; flex-wrap: wrap; justify-content: center;">
+                    <span class="highlight">📜 批次檔 (.bat)</span>
+                    <span class="highlight">💠 PowerShell (.ps1)</span>
+                    <span class="highlight">🐍 Python 腳本</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 2: 為什麼需要自動化 -->
+        <div class="slide">
+            <div class="content-card">
+                <h2>❓ 為什麼需要自動化腳本？</h2>
+                <p>每次都要手動輸入長長的指令，既麻煩又容易出錯。</p>
+
+                <div class="concept-grid">
+                    <div class="concept-card">
+                        <div class="file-icon">😫</div>
+                        <h3>手動輸入的痛點</h3>
+                        <ul>
+                            <li>指令太長，容易打錯</li>
+                            <li>每次都要記參數</li>
+                            <li>多個檔案要重複執行</li>
+                            <li>不同格式要分開處理</li>
+                        </ul>
+                    </div>
+                    <div class="concept-card">
+                        <div class="file-icon">🚀</div>
+                        <h3>自動化的優點</h3>
+                        <ul>
+                            <li>一鍵完成所有轉換</li>
+                            <li>設定好就不用再記</li>
+                            <li>批次處理多個檔案</li>
+                            <li>同時輸出多種格式</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="box info">
+                    <strong>📌 本單元目標：</strong>建立可重複使用的腳本，把 Markdown 一次轉換成 PDF、Word、HTML 三種格式！
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 3: 方案比較 -->
+        <div class="slide">
+            <div class="content-card">
+                <h2>🔄 三種自動化方案比較</h2>
+
+                <table>
+                    <tr>
+                        <th>方案</th>
+                        <th>副檔名</th>
+                        <th>優點</th>
+                        <th>適合對象</th>
+                    </tr>
+                    <tr>
+                        <td><strong>批次檔</strong></td>
+                        <td><code>.bat</code></td>
+                        <td>最簡單、Windows 原生支援</td>
+                        <td>初學者</td>
+                    </tr>
+                    <tr>
+                        <td><strong>PowerShell</strong></td>
+                        <td><code>.ps1</code></td>
+                        <td>功能更強、語法更現代</td>
+                        <td>進階用戶</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Python</strong></td>
+                        <td><code>.py</code></td>
+                        <td>最靈活、跨平台</td>
+                        <td>會 Python 的人</td>
+                    </tr>
+                </table>
+
+                <div class="box tip">
+                    <strong>💡 建議：</strong>如果你是新手，先從<strong>批次檔</strong>開始，它最容易理解和使用。
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 4: 批次檔基礎 -->
+        <div class="slide">
+            <div class="content-card">
+                <h2>📜 批次檔 (.bat) 基礎知識</h2>
+
+                <h3>什麼是批次檔？</h3>
+                <p>批次檔是一個純文字檔案，裡面包含一連串的 Windows 命令，可以一次執行。</p>
+
+                <h3>建立批次檔的步驟</h3>
+                <div class="step-container">
+                    <span class="step-number">1</span>
+                    <span class="step-title">開啟記事本</span>
+                </div>
+                <div class="step-container">
+                    <span class="step-number">2</span>
+                    <span class="step-title">輸入指令內容</span>
+                </div>
+                <div class="step-container">
+                    <span class="step-number">3</span>
+                    <span class="step-title">另存新檔</span>
+                    <div class="step-content">
+                        <ul>
+                            <li>檔案名稱：<code>convert.bat</code>（副檔名要是 .bat）</li>
+                            <li>存檔類型：「所有檔案 (*.*)」</li>
+                            <li>編碼：「ANSI」或「UTF-8」</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="step-container">
+                    <span class="step-number">4</span>
+                    <span class="step-title">雙擊執行</span>
+                    <div class="step-content">
+                        <p>或者把 Markdown 檔案拖曳到批次檔圖示上</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 5: 簡單的批次檔 -->
+        <div class="slide">
+            <div class="content-card">
+                <h2>📝 第一個批次檔：單檔轉換</h2>
+                <p>這個腳本會將指定的 Markdown 檔案轉換成 PDF、Word、HTML 三種格式。</p>
+
+                <div class="script-box">
+                    <div class="script-header">
+                        <span class="script-icon">📜</span>
+                        <span class="script-name">convert.bat</span>
+                        <span class="script-type">Windows 批次檔</span>
+                    </div>
+                    <pre style="margin: 0; background: none;"><code><span class="code-keyword">@echo off</span>
+<span class="code-comment">REM 設定要轉換的檔案名稱（不含副檔名）</span>
+<span class="code-keyword">set</span> <span class="code-variable">FILENAME</span>=<span class="code-string">test</span>
+
+<span class="code-keyword">echo</span> 開始轉換 %FILENAME%.md ...
+
+<span class="code-comment">REM 轉換為 PDF（使用 XeLaTeX + 中文字型）</span>
+pandoc %FILENAME%.md -o %FILENAME%.pdf --pdf-engine=xelatex -V CJKmainfont="Microsoft JhengHei"
+
+<span class="code-comment">REM 轉換為 Word</span>
+pandoc %FILENAME%.md -o %FILENAME%.docx
+
+<span class="code-comment">REM 轉換為 HTML（完整網頁 + MathJax 數學公式）</span>
+pandoc %FILENAME%.md -o %FILENAME%.html -s --mathjax
+
+<span class="code-keyword">echo</span> 轉換完成！
+<span class="code-keyword">pause</span></code></pre>
+                </div>
+
+                <div class="box success">
+                    <strong>✅ 使用方式：</strong>
+                    <ol>
+                        <li>把這個 <code>convert.bat</code> 放在 Markdown 檔案的同一個資料夾</li>
+                        <li>修改 <code>FILENAME=test</code> 為你的檔案名稱</li>
+                        <li>雙擊執行</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 6: 拖曳檔案版本 -->
+        <div class="slide">
+            <div class="content-card">
+                <h2>🖱️ 進階：拖曳檔案即可轉換</h2>
+                <p>這個版本更方便！只要把 Markdown 檔案拖曳到批次檔圖示上，就會自動轉換。</p>
+
+                <div class="script-box">
+                    <div class="script-header">
+                        <span class="script-icon">📜</span>
+                        <span class="script-name">convert_dragdrop.bat</span>
+                        <span class="script-type">拖曳即轉換版本</span>
+                    </div>
+                    <pre style="margin: 0; background: none;"><code><span class="code-keyword">@echo off</span>
+<span class="code-keyword">chcp 65001</span> >nul
+<span class="code-comment">REM 檢查是否有拖曳檔案進來</span>
+<span class="code-keyword">if</span> "<span class="code-variable">%~1</span>"=="" (
+    <span class="code-keyword">echo</span> 用法：將 Markdown 檔案拖曳到本批次檔上
+    <span class="code-keyword">echo</span> 或執行：convert_dragdrop.bat 檔案名稱.md
+    <span class="code-keyword">pause</span>
+    <span class="code-keyword">goto :EOF</span>
+)
+
+<span class="code-comment">REM 取得輸入檔案的路徑和名稱</span>
+<span class="code-keyword">set</span> "<span class="code-variable">INFILE</span>=<span class="code-variable">%~1</span>"
+<span class="code-keyword">set</span> "<span class="code-variable">OUTNAME</span>=<span class="code-variable">%~dpn1</span>"
+
+<span class="code-keyword">echo</span> ========================================
+<span class="code-keyword">echo</span> 正在轉換：<span class="code-variable">%INFILE%</span>
+<span class="code-keyword">echo</span> ========================================
+
+<span class="code-comment">REM 轉換為 PDF</span>
+<span class="code-keyword">echo</span> [1/3] 轉換為 PDF...
+pandoc "<span class="code-variable">%INFILE%</span>" -o "<span class="code-variable">%OUTNAME%</span>.pdf" --pdf-engine=xelatex -V CJKmainfont="Microsoft JhengHei"
+
+<span class="code-comment">REM 轉換為 Word</span>
+<span class="code-keyword">echo</span> [2/3] 轉換為 Word...
+pandoc "<span class="code-variable">%INFILE%</span>" -o "<span class="code-variable">%OUTNAME%</span>.docx"
+
+<span class="code-comment">REM 轉換為 HTML</span>
+<span class="code-keyword">echo</span> [3/3] 轉換為 HTML...
+pandoc "<span class="code-variable">%INFILE%</span>" -o "<span class="code-variable">%OUTNAME%</span>.html" -s --mathjax
+
+<span class="code-keyword">echo</span> ========================================
+<span class="code-keyword">echo</span> 完成！輸出檔案位於：<span class="code-variable">%~dp1</span>
+<span class="code-keyword">echo</span> ========================================
+<span class="code-keyword">pause</span></code></pre>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 7: 變數說明 -->
+        <div class="slide">
+            <div class="content-card">
+                <h2>📖 批次檔變數說明</h2>
+                <p>理解這些變數，你就能自己修改腳本了！</p>
+
+                <table>
+                    <tr>
+                        <th>變數</th>
+                        <th>含義</th>
+                        <th>範例（輸入 D:\docs\test.md）</th>
+                    </tr>
+                    <tr>
+                        <td><code>%~1</code></td>
+                        <td>第一個參數（完整路徑）</td>
+                        <td><code>D:\docs\test.md</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>%~d1</code></td>
+                        <td>磁碟機代號</td>
+                        <td><code>D:</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>%~p1</code></td>
+                        <td>路徑（不含檔名）</td>
+                        <td><code>\docs\</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>%~n1</code></td>
+                        <td>檔案名稱（不含副檔名）</td>
+                        <td><code>test</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>%~x1</code></td>
+                        <td>副檔名</td>
+                        <td><code>.md</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>%~dp1</code></td>
+                        <td>磁碟機 + 路徑</td>
+                        <td><code>D:\docs\</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>%~dpn1</code></td>
+                        <td>完整路徑 + 檔名（不含副檔名）</td>
+                        <td><code>D:\docs\test</code></td>
+                    </tr>
+                </table>
+
+                <div class="box tip">
+                    <strong>💡 小技巧：</strong><code>%~dpn1</code> 最常用，加上新副檔名就是輸出檔名！
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 8: 批次處理多個檔案 -->
+        <div class="slide">
+            <div class="content-card">
+                <h2>📁 批次處理：一次轉換資料夾內所有 .md 檔案</h2>
+
+                <div class="script-box">
+                    <div class="script-header">
+                        <span class="script-icon">📜</span>
+                        <span class="script-name">convert_all.bat</span>
+                        <span class="script-type">批次處理版本</span>
+                    </div>
+                    <pre style="margin: 0; background: none;"><code><span class="code-keyword">@echo off</span>
+<span class="code-keyword">chcp 65001</span> >nul
+<span class="code-keyword">echo</span> ========================================
+<span class="code-keyword">echo</span> 批次轉換所有 Markdown 檔案
+<span class="code-keyword">echo</span> ========================================
+
+<span class="code-comment">REM 計數器</span>
+<span class="code-keyword">set</span> /a <span class="code-variable">COUNT</span>=0
+
+<span class="code-comment">REM 迴圈處理當前資料夾內所有 .md 檔案</span>
+<span class="code-keyword">for</span> %%f <span class="code-keyword">in</span> (*.md) <span class="code-keyword">do</span> (
+    <span class="code-keyword">echo</span> 正在轉換：%%f
+
+    <span class="code-comment">REM 轉換為 PDF</span>
+    pandoc "%%f" -o "%%~nf.pdf" --pdf-engine=xelatex -V CJKmainfont="Microsoft JhengHei"
+
+    <span class="code-comment">REM 轉換為 Word</span>
+    pandoc "%%f" -o "%%~nf.docx"
+
+    <span class="code-comment">REM 轉換為 HTML</span>
+    pandoc "%%f" -o "%%~nf.html" -s --mathjax
+
+    <span class="code-keyword">set</span> /a <span class="code-variable">COUNT</span>+=1
+)
+
+<span class="code-keyword">echo</span> ========================================
+<span class="code-keyword">echo</span> 完成！共轉換 %COUNT% 個檔案
+<span class="code-keyword">echo</span> ========================================
+<span class="code-keyword">pause</span></code></pre>
+                </div>
+
+                <div class="box warning">
+                    <strong>⚠️ 使用前請確認：</strong>把這個批次檔放到存放 .md 檔案的資料夾中執行。
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 9: PowerShell 腳本 -->
+        <div class="slide">
+            <div class="content-card">
+                <h2>💠 PowerShell 腳本版本</h2>
+                <p>PowerShell 語法更現代、功能更強大，適合進階用戶。</p>
+
+                <div class="script-box">
+                    <div class="script-header">
+                        <span class="script-icon">💠</span>
+                        <span class="script-name">convert.ps1</span>
+                        <span class="script-type">PowerShell 腳本</span>
+                    </div>
+                    <pre style="margin: 0; background: none; font-size: 14px;"><code><span class="code-comment"># 接收參數：輸入檔案路徑</span>
+<span class="code-keyword">param</span>(
+    [<span class="code-keyword">Parameter</span>(Mandatory=$true)]
+    [<span class="code-keyword">string</span>]$InputFile
+)
+
+<span class="code-comment"># 取得檔案資訊</span>
+$baseName = [System.IO.Path]::GetFileNameWithoutExtension($InputFile)
+$directory = [System.IO.Path]::GetDirectoryName($InputFile)
+<span class="code-keyword">if</span> ($directory -eq "") { $directory = "." }
+
+<span class="code-keyword">Write-Host</span> "========================================" -ForegroundColor Cyan
+<span class="code-keyword">Write-Host</span> "開始轉換: $InputFile" -ForegroundColor Green
+<span class="code-keyword">Write-Host</span> "========================================" -ForegroundColor Cyan
+
+<span class="code-comment"># 轉換為 PDF</span>
+<span class="code-keyword">Write-Host</span> "[1/3] 轉換為 PDF..." -ForegroundColor Yellow
+pandoc $InputFile -o "$directory\$baseName.pdf" --pdf-engine=xelatex -V CJKmainfont="Microsoft JhengHei"
+
+<span class="code-comment"># 轉換為 Word</span>
+<span class="code-keyword">Write-Host</span> "[2/3] 轉換為 Word..." -ForegroundColor Yellow
+pandoc $InputFile -o "$directory\$baseName.docx"
+
+<span class="code-comment"># 轉換為 HTML</span>
+<span class="code-keyword">Write-Host</span> "[3/3] 轉換為 HTML..." -ForegroundColor Yellow
+pandoc $InputFile -o "$directory\$baseName.html" -s --mathjax
+
+<span class="code-keyword">Write-Host</span> "========================================" -ForegroundColor Cyan
+<span class="code-keyword">Write-Host</span> "轉換完成！" -ForegroundColor Green
+<span class="code-keyword">Write-Host</span> "輸出位置: $directory" -ForegroundColor Green
+<span class="code-keyword">Write-Host</span> "========================================" -ForegroundColor Cyan</code></pre>
+                </div>
+
+                <h3>執行方式</h3>
+                <pre><code>.\convert.ps1 -InputFile "test.md"</code></pre>
+            </div>
+        </div>
+
+        <!-- Slide 10: PowerShell 執行政策 -->
+        <div class="slide">
+            <div class="content-card">
+                <h2>⚙️ PowerShell 執行政策設定</h2>
+                <p>如果第一次執行 PowerShell 腳本，可能會遇到安全性錯誤。</p>
+
+                <div class="box danger">
+                    <strong>❌ 常見錯誤訊息：</strong><br>
+                    <code>因為這個系統上已停用指令碼執行，所以無法載入...</code>
+                </div>
+
+                <h3>解決方法</h3>
+                <div class="step-container">
+                    <span class="step-number">1</span>
+                    <span class="step-title">以系統管理員身分開啟 PowerShell</span>
+                    <div class="step-content">
+                        <p>在開始選單搜尋「PowerShell」→ 右鍵 → 以系統管理員身分執行</p>
+                    </div>
+                </div>
+
+                <div class="step-container">
+                    <span class="step-number">2</span>
+                    <span class="step-title">執行以下指令</span>
+                    <div class="step-content">
+                        <pre><code>Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser</code></pre>
+                        <p>當詢問是否變更時，輸入 <code>Y</code> 確認</p>
+                    </div>
+                </div>
+
+                <div class="box info">
+                    <strong>📌 說明：</strong><code>RemoteSigned</code> 允許執行本機腳本，但從網路下載的腳本需要簽章。這是安全又實用的設定。
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 11: Python 腳本 -->
+        <div class="slide">
+            <div class="content-card">
+                <h2>🐍 Python 腳本版本</h2>
+                <p>如果你會 Python，可以用這個更靈活的版本。</p>
+
+                <div class="script-box">
+                    <div class="script-header">
+                        <span class="script-icon">🐍</span>
+                        <span class="script-name">convert.py</span>
+                        <span class="script-type">Python 腳本</span>
+                    </div>
+                    <pre style="margin: 0; background: none; font-size: 14px;"><code><span class="code-keyword">import</span> subprocess
+<span class="code-keyword">import</span> sys
+<span class="code-keyword">import</span> os
+
+<span class="code-keyword">def</span> <span class="code-variable">convert_markdown</span>(input_file):
+    <span class="code-comment"># 取得檔案名稱（不含副檔名）</span>
+    base_name = os.path.splitext(input_file)[0]
+
+    <span class="code-keyword">print</span>(<span class="code-string">f"開始轉換: {input_file}"</span>)
+
+    <span class="code-comment"># 定義轉換任務</span>
+    tasks = [
+        (<span class="code-string">"PDF"</span>, [<span class="code-string">"pandoc"</span>, input_file, <span class="code-string">"-o"</span>, <span class="code-string">f"{base_name}.pdf"</span>,
+                  <span class="code-string">"--pdf-engine=xelatex"</span>, <span class="code-string">"-V"</span>, <span class="code-string">"CJKmainfont=Microsoft JhengHei"</span>]),
+        (<span class="code-string">"Word"</span>, [<span class="code-string">"pandoc"</span>, input_file, <span class="code-string">"-o"</span>, <span class="code-string">f"{base_name}.docx"</span>]),
+        (<span class="code-string">"HTML"</span>, [<span class="code-string">"pandoc"</span>, input_file, <span class="code-string">"-o"</span>, <span class="code-string">f"{base_name}.html"</span>, <span class="code-string">"-s"</span>, <span class="code-string">"--mathjax"</span>]),
+    ]
+
+    <span class="code-keyword">for</span> name, cmd <span class="code-keyword">in</span> tasks:
+        <span class="code-keyword">print</span>(<span class="code-string">f"  轉換為 {name}..."</span>)
+        subprocess.run(cmd, check=<span class="code-keyword">True</span>)
+
+    <span class="code-keyword">print</span>(<span class="code-string">"轉換完成！"</span>)
+
+<span class="code-keyword">if</span> __name__ == <span class="code-string">"__main__"</span>:
+    <span class="code-keyword">if</span> len(sys.argv) < 2:
+        <span class="code-keyword">print</span>(<span class="code-string">"用法: python convert.py &lt;markdown檔案&gt;"</span>)
+        sys.exit(1)
+    convert_markdown(sys.argv[1])</code></pre>
+                </div>
+
+                <h3>執行方式</h3>
+                <pre><code>python convert.py test.md</code></pre>
+            </div>
+        </div>
+
+        <!-- Slide 12: 建立右鍵選單 -->
+        <div class="slide">
+            <div class="content-card">
+                <h2>🖱️ 進階技巧：加入右鍵選單</h2>
+                <p>想要更方便？可以把轉換功能加入 Windows 右鍵選單！</p>
+
+                <div class="step-container">
+                    <span class="step-number">1</span>
+                    <span class="step-title">建立登錄檔 (.reg)</span>
+                    <div class="step-content">
+                        <p>建立 <code>add_pandoc_menu.reg</code>：</p>
+                        <pre style="font-size: 14px;"><code>Windows Registry Editor Version 5.00
+
+[HKEY_CLASSES_ROOT\.md\shell\PandocConvert]
+@="Pandoc 轉換"
+
+[HKEY_CLASSES_ROOT\.md\shell\PandocConvert\command]
+@="\"C:\\path\\to\\convert.bat\" \"%1\""</code></pre>
+                    </div>
+                </div>
+
+                <div class="step-container">
+                    <span class="step-number">2</span>
+                    <span class="step-title">修改路徑</span>
+                    <div class="step-content">
+                        <p>把 <code>C:\\path\\to\\convert.bat</code> 改成你的批次檔實際路徑</p>
+                        <p><strong>注意：</strong>路徑中的 <code>\</code> 要寫成 <code>\\</code></p>
+                    </div>
+                </div>
+
+                <div class="step-container">
+                    <span class="step-number">3</span>
+                    <span class="step-title">雙擊執行 .reg 檔案</span>
+                    <div class="step-content">
+                        <p>確認後，對任何 .md 檔案點右鍵，就會出現「Pandoc 轉換」選項！</p>
+                    </div>
+                </div>
+
+                <div class="box warning">
+                    <strong>⚠️ 警告：</strong>修改登錄檔有風險，請確保你輸入的內容正確。如要移除，刪除對應的登錄機碼即可。
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 13: 完整專案腳本 -->
+        <div class="slide">
+            <div class="content-card">
+                <h2>📦 實用範例：專案文件產生器</h2>
+                <p>這個腳本適合用在專案文件管理，會建立輸出資料夾並整理檔案。</p>
+
+                <div class="script-box">
+                    <div class="script-header">
+                        <span class="script-icon">📜</span>
+                        <span class="script-name">project_docs.bat</span>
+                        <span class="script-type">專案文件產生器</span>
+                    </div>
+                    <pre style="margin: 0; background: none; font-size: 13px;"><code><span class="code-keyword">@echo off</span>
+<span class="code-keyword">chcp 65001</span> >nul
+<span class="code-keyword">setlocal enabledelayedexpansion</span>
+
+<span class="code-comment">REM 設定輸出資料夾</span>
+<span class="code-keyword">set</span> <span class="code-variable">OUTPUT_DIR</span>=output
+<span class="code-keyword">set</span> <span class="code-variable">PDF_DIR</span>=%OUTPUT_DIR%\pdf
+<span class="code-keyword">set</span> <span class="code-variable">DOCX_DIR</span>=%OUTPUT_DIR%\word
+<span class="code-keyword">set</span> <span class="code-variable">HTML_DIR</span>=%OUTPUT_DIR%\html
+
+<span class="code-comment">REM 建立資料夾</span>
+<span class="code-keyword">if not exist</span> "%OUTPUT_DIR%" <span class="code-keyword">mkdir</span> "%OUTPUT_DIR%"
+<span class="code-keyword">if not exist</span> "%PDF_DIR%" <span class="code-keyword">mkdir</span> "%PDF_DIR%"
+<span class="code-keyword">if not exist</span> "%DOCX_DIR%" <span class="code-keyword">mkdir</span> "%DOCX_DIR%"
+<span class="code-keyword">if not exist</span> "%HTML_DIR%" <span class="code-keyword">mkdir</span> "%HTML_DIR%"
+
+<span class="code-keyword">echo</span> ==========================================
+<span class="code-keyword">echo</span>   專案文件產生器
+<span class="code-keyword">echo</span> ==========================================
+
+<span class="code-keyword">for</span> %%f <span class="code-keyword">in</span> (*.md) <span class="code-keyword">do</span> (
+    <span class="code-keyword">echo</span> 處理: %%f
+    pandoc "%%f" -o "%PDF_DIR%\%%~nf.pdf" --pdf-engine=xelatex -V CJKmainfont="Microsoft JhengHei"
+    pandoc "%%f" -o "%DOCX_DIR%\%%~nf.docx"
+    pandoc "%%f" -o "%HTML_DIR%\%%~nf.html" -s --mathjax
+)
+
+<span class="code-keyword">echo</span> ==========================================
+<span class="code-keyword">echo</span> 完成！檔案已輸出到 %OUTPUT_DIR% 資料夾
+<span class="code-keyword">echo</span> ==========================================
+<span class="code-keyword">pause</span></code></pre>
+                </div>
+
+                <p>執行後會產生以下結構：</p>
+                <pre><code>output/
+├── pdf/
+│   └── *.pdf
+├── word/
+│   └── *.docx
+└── html/
+    └── *.html</code></pre>
+            </div>
+        </div>
+
+        <!-- Slide 14: 常見問題 -->
+        <div class="slide">
+            <div class="content-card">
+                <h2>❓ 常見問題與解決方法</h2>
+
+                <div class="step-container">
+                    <h4>Q1：執行批次檔後視窗一閃而過？</h4>
+                    <div class="step-content">
+                        <p><strong>解決：</strong>在腳本最後加上 <code>pause</code>，或在 CMD 中手動執行腳本查看錯誤訊息。</p>
+                    </div>
+                </div>
+
+                <div class="step-container">
+                    <h4>Q2：中文路徑或檔名出現亂碼？</h4>
+                    <div class="step-content">
+                        <p><strong>解決：</strong>在腳本開頭加上 <code>chcp 65001</code> 切換到 UTF-8 編碼。</p>
+                    </div>
+                </div>
+
+                <div class="step-container">
+                    <h4>Q3：找不到 pandoc 指令？</h4>
+                    <div class="step-content">
+                        <p><strong>解決：</strong>確認 Pandoc 已安裝且在 PATH 環境變數中。重新開機後再試。</p>
+                    </div>
+                </div>
+
+                <div class="step-container">
+                    <h4>Q4：PDF 轉換失敗？</h4>
+                    <div class="step-content">
+                        <p><strong>解決：</strong>確認 MiKTeX 已安裝。第一次轉換時會下載套件，需要網路連線。</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 15: 總結 -->
+        <div class="slide">
+            <div class="content-card">
+                <h2>🎉 Part 5 總結 & 課程完結</h2>
+                <p>恭喜你完成了 Pandoc 完整教學！</p>
+
+                <div class="concept-grid">
+                    <div class="concept-card">
+                        <h3>📜 批次檔重點</h3>
+                        <ul>
+                            <li><code>@echo off</code> 隱藏指令</li>
+                            <li><code>%~dpn1</code> 取得路徑和檔名</li>
+                            <li><code>for %%f in (*)</code> 迴圈處理</li>
+                            <li><code>pause</code> 暫停等待</li>
+                        </ul>
+                    </div>
+                    <div class="concept-card">
+                        <h3>💠 PowerShell 重點</h3>
+                        <ul>
+                            <li><code>param()</code> 接收參數</li>
+                            <li><code>Write-Host</code> 輸出訊息</li>
+                            <li>設定 ExecutionPolicy</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="box success" style="margin-top: 30px;">
+                    <h3>🎓 你已經學會的技能</h3>
+                    <div class="concept-grid" style="margin-top: 15px;">
+                        <div>✅ Part 1：Pandoc 安裝與基礎</div>
+                        <div>✅ Part 2：格式轉換（MD↔Word↔HTML）</div>
+                        <div>✅ Part 3：PDF 輸出與中文字型</div>
+                        <div>✅ Part 4：公式、圖片、圖表</div>
+                        <div>✅ Part 5：自動化腳本</div>
+                    </div>
+                </div>
+
+                <p style="text-align: center; margin-top: 30px; font-size: 24px;">
+                    🚀 現在你已經是 <strong>Pandoc 文件轉換大師</strong> 了！
+                </p>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- 導航箭頭 -->
+    <button class="nav-arrow prev-arrow" id="prevBtn" onclick="changeSlide(-1)">❮</button>
+    <button class="nav-arrow next-arrow" id="nextBtn" onclick="changeSlide(1)">❯</button>
+
+    <!-- 頁碼指示器 -->
+    <div class="indicators" id="indicatorContainer"></div>
+
+    <script>
+        let currentSlide = 0;
+        const slides = document.querySelectorAll('.slide');
+        const totalSlides = slides.length;
+
+        function init() {
+            createIndicators();
+            showSlide(0);
+            updateButtons();
+            document.addEventListener('keydown', handleKeydown);
+        }
+
+        function handleKeydown(e) {
+            if (e.key === 'ArrowLeft') changeSlide(-1);
+            if (e.key === 'ArrowRight') changeSlide(1);
+        }
+
+        function createIndicators() {
+            const container = document.getElementById('indicatorContainer');
+            container.innerHTML = '';
+            slides.forEach((_, index) => {
+                const dot = document.createElement('div');
+                dot.className = 'dot';
+                dot.onclick = () => goToSlide(index);
+                container.appendChild(dot);
+            });
+        }
+
+        function showSlide(index) {
+            if (index < 0) index = 0;
+            if (index >= totalSlides) index = totalSlides - 1;
+
+            slides.forEach(slide => slide.classList.remove('active'));
+            slides[index].classList.add('active');
+            currentSlide = index;
+
+            const dots = document.querySelectorAll('.dot');
+            dots.forEach((dot, idx) => {
+                dot.classList.toggle('active', idx === index);
+            });
+
+            updateButtons();
+        }
+
+        function changeSlide(direction) {
+            showSlide(currentSlide + direction);
+        }
+
+        function goToSlide(index) {
+            showSlide(index);
+        }
+
+        function updateButtons() {
+            document.getElementById('prevBtn').disabled = currentSlide === 0;
+            document.getElementById('nextBtn').disabled = currentSlide === totalSlides - 1;
+        }
+
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen();
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                }
+            }
+        }
+
+        init();
+    </script>
+</body>
+</html>

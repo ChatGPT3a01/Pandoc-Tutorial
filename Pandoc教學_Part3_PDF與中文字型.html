@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Part 3 - PDF 輸出與中文字型</title>
+    <style>
+        /* 基礎設定 */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft JhengHei', 'Segoe UI', Arial, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            min-height: 100vh;
+            overflow: hidden;
+            color: #333;
+        }
+
+        /* === 導航列 === */
+        .nav-bar {
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            height: 60px;
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 30px;
+            z-index: 10000;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .nav-title {
+            font-size: 22px;
+            font-weight: 700;
+            color: #fff;
+            letter-spacing: 1px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .nav-buttons { display: flex; gap: 12px; }
+
+        .nav-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            color: white;
+            padding: 6px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .nav-btn:hover {
+            background: rgba(255, 255, 255, 0.4);
+            transform: translateY(-2px);
+        }
+
+        /* === 導航箭頭 === */
+        .nav-arrow {
+            position: fixed;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(255,255,255,0.25);
+            color: white;
+            width: 60px; height: 60px;
+            border-radius: 50%;
+            border: 2px solid rgba(255,255,255,0.4);
+            font-size: 24px;
+            cursor: pointer;
+            z-index: 9000;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .nav-arrow:hover {
+            background: rgba(255,255,255,0.5);
+            transform: translateY(-50%) scale(1.1);
+        }
+        .prev-arrow { left: 30px; }
+        .next-arrow { right: 30px; }
+        .nav-arrow:disabled { opacity: 0.3; cursor: not-allowed; }
+
+        /* === 投影片容器 === */
+        .slide-container {
+            width: 100%;
+            height: 100vh;
+            padding-top: 60px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .slide {
+            position: absolute;
+            top: 60px; left: 0;
+            width: 100%;
+            height: calc(100vh - 60px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+            opacity: 0;
+            transition: opacity 0.4s ease;
+            z-index: 10;
+        }
+
+        .slide.active {
+            display: flex;
+            opacity: 1;
+            z-index: 20;
+        }
+
+        /* === 內容卡片 === */
+        .content-card {
+            background: rgba(255, 255, 255, 0.98);
+            border-radius: 24px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+            padding: 60px;
+            max-width: 1400px;
+            width: 95%;
+            max-height: 88vh;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        /* 其他通用樣式 */
+        h1 { color: #1e3c72; font-size: 56px; margin-bottom: 24px; text-align: center; }
+        h2 { color: #2a5298; font-size: 38px; margin-bottom: 35px; border-bottom: 3px solid #1e3c72; padding-bottom: 12px; }
+        h3 { color: #1e3c72; font-size: 26px; margin: 30px 0 15px 0; }
+        h4 { color: #2a5298; font-size: 22px; margin: 20px 0 10px 0; }
+        p, li { font-size: 20px; line-height: 1.8; color: #444; margin-bottom: 15px; }
+        code { background: #f0f2f5; padding: 3px 8px; border-radius: 6px; font-family: 'Consolas', monospace; color: #d63384; font-weight: 600; font-size: 0.95em; }
+        pre { background: #282c34; color: #abb2bf; padding: 25px; border-radius: 12px; overflow-x: auto; margin: 25px 0; font-size: 18px; line-height: 1.6; font-family: 'Consolas', monospace; }
+        pre code { background: none; color: #abb2bf; padding: 0; }
+
+        .box { padding: 25px; border-radius: 12px; margin: 25px 0; border-left: 6px solid; font-size: 18px; }
+        .info { background: #e3f2fd; border-color: #2196f3; color: #0d47a1; }
+        .warning { background: #fff3cd; border-color: #ffc107; color: #856404; }
+        .success { background: #d4edda; border-color: #28a745; color: #155724; }
+        .danger { background: #f8d7da; border-color: #dc3545; color: #721c24; }
+        .tip { background: #f3e5f5; border-color: #9c27b0; color: #4a148c; }
+        .highlight { background: linear-gradient(120deg, #84fab0 0%, #8fd3f4 100%); padding: 2px 6px; border-radius: 4px; font-weight: bold; color: #004d40; }
+
+        .step-container { background: #f8f9fa; border-radius: 15px; padding: 30px; margin: 25px 0; border: 2px solid #e9ecef; }
+        .step-number { display: inline-block; background: linear-gradient(135deg, #1e3c72, #2a5298); color: white; width: 36px; height: 36px; border-radius: 50%; text-align: center; line-height: 36px; font-weight: bold; margin-right: 15px; }
+        .step-title { font-size: 22px; font-weight: bold; color: #1e3c72; display: inline; }
+        .step-content { margin-top: 15px; padding-left: 51px; }
+
+        .concept-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 25px; margin-top: 30px; }
+        .concept-card { background: #f8f9fa; padding: 25px; border-radius: 15px; border: 1px solid #e9ecef; transition: transform 0.3s; }
+        .concept-card:hover { transform: translateY(-8px); border-color: #4facfe; }
+
+        .file-icon { font-size: 48px; text-align: center; margin-bottom: 15px; }
+
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { padding: 15px; text-align: left; border-bottom: 1px solid #e9ecef; }
+        th { background: #f8f9fa; color: #1e3c72; font-weight: 700; }
+        tr:hover { background: #f8f9fa; }
+
+        .indicators { position: fixed; bottom: 25px; left: 50%; transform: translateX(-50%); display: flex; gap: 12px; z-index: 4000; padding: 10px 25px; background: rgba(0,0,0,0.3); border-radius: 30px; backdrop-filter: blur(5px); }
+        .dot { width: 12px; height: 12px; background: rgba(255,255,255,0.4); border-radius: 50%; cursor: pointer; transition: all 0.3s; }
+        .dot.active { background: #4facfe; transform: scale(1.3); }
+
+        .download-btn {
+            display: inline-block;
+            background: linear-gradient(135deg, #1e3c72, #2a5298);
+            color: white;
+            padding: 15px 30px;
+            border-radius: 10px;
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 18px;
+            transition: all 0.3s;
+            margin: 10px 5px;
+        }
+        .download-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        }
+
+        .comparison-table td:first-child { font-weight: bold; }
+        .good { color: #28a745; }
+        .bad { color: #dc3545; }
+    </style>
+</head>
+<body>
+
+    <!-- 導航列 -->
+    <div class="nav-bar">
+        <div class="nav-title">Part 3 - PDF 輸出與中文字型</div>
+        <div class="nav-buttons">
+            <a href="Pandoc教學_統整頁.html" class="nav-btn">📚 回到目錄</a>
+            <a href="Pandoc教學_Part2_基礎格式轉換.html" class="nav-btn">⬅️ Part 2</a>
+            <a href="Pandoc教學_Part4_進階功能.html" class="nav-btn">Part 4 ➡️</a>
+            <button class="nav-btn" onclick="toggleFullscreen()">🖥️ 全螢幕</button>
+            <a href="https://miktex.org/download" target="_blank" class="nav-btn">📦 MiKTeX</a>
+            <a href="https://fonts.google.com/noto/specimen/Noto+Serif+TC" target="_blank" class="nav-btn">🔤 Noto 字型</a>
+        </div>
+    </div>
+
+    <!-- 投影片內容 -->
+    <div class="slide-container">
+
+        <!-- Slide 1: 封面 -->
+        <div class="slide active">
+            <div class="content-card" style="text-align: center; display: flex; flex-direction: column; justify-content: center; align-items: center;">
+                <h4 style="color: #4facfe; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 10px;">Pandoc 文件轉換大師</h4>
+                <h1>Part 3: PDF 輸出與中文字型</h1>
+                <h2 style="border: none; font-weight: normal; font-size: 28px; color: #666; max-width: 800px;">
+                    安裝 LaTeX 引擎，解決繁體中文顯示問題
+                </h2>
+                <div style="margin-top: 40px; display: flex; gap: 20px; flex-wrap: wrap; justify-content: center;">
+                    <span class="highlight">📦 MiKTeX 安裝</span>
+                    <span class="highlight">⚙️ XeLaTeX 引擎</span>
+                    <span class="highlight">🔤 中文字型設定</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 2: 為什麼需要 LaTeX -->
+        <div class="slide">
+            <div class="content-card">
+                <h2>❓ 為什麼轉 PDF 需要額外安裝東西？</h2>
+                <p>Pandoc 本身<strong>不包含 PDF 排版引擎</strong>，它需要借助外部工具來產生 PDF。</p>
+
+                <div class="concept-grid">
+                    <div class="concept-card">
+                        <div class="file-icon">📝</div>
+                        <h3>Pandoc 負責</h3>
+                        <p>讀取 Markdown 並轉換成中間格式（LaTeX）</p>
+                    </div>
+                    <div class="concept-card">
+                        <div class="file-icon">⚙️</div>
+                        <h3>LaTeX 負責</h3>
+                        <p>將中間格式排版並輸出成精美的 PDF</p>
+                    </div>
+                </div>
+
+                <div class="box danger">
+                    <strong>🚫 常見錯誤訊息：</strong><br>
+                    如果你直接執行 <code>pandoc test.md -o test.pdf</code> 而沒有安裝 LaTeX，會看到：<br>
+                    <code style="color: #721c24;">pdflatex not found. Please select a different --pdf-engine or install pdflatex</code>
+                </div>
+
+                <div class="box info">
+                    <strong>💡 解決方案：</strong>安裝 MiKTeX（Windows 上最推薦的 LaTeX 發行版）
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 3: 安裝 MiKTeX Step 1 -->
+        <div class="slide">
+            <div class="content-card">
+                <h2>📦 Step 1：下載 MiKTeX</h2>
+
+                <div class="step-container">
+                    <span class="step-number">1</span>
+                    <span class="step-title">前往 MiKTeX 官方網站</span>
+                    <div class="step-content">
+                        <p style="text-align: center; margin: 20px 0;">
+                            <a href="https://miktex.org/download" target="_blank" class="download-btn">
+                                🌐 前往 miktex.org/download
+                            </a>
+                        </p>
+                    </div>
+                </div>
+
+                <div class="step-container">
+                    <span class="step-number">2</span>
+                    <span class="step-title">選擇 Windows 版本下載</span>
+                    <div class="step-content">
+                        <p>點擊頁面上的 <strong>「Download」</strong> 按鈕，下載 Windows 安裝檔。</p>
+                        <p>檔案名稱類似：<code>basic-miktex-24.1-x64.exe</code>（版本號可能不同）</p>
+                    </div>
+                </div>
+
+                <div class="box tip">
+                    <strong>💡 檔案大小：</strong>Basic MiKTeX 安裝檔約 200-300 MB，下載可能需要幾分鐘。
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 4: 安裝 MiKTeX Step 2 -->
+        <div class="slide">
+            <div class="content-card">
+                <h2>📦 Step 2：執行安裝程式</h2>
+
+                <div class="step-container">
+                    <span class="step-number">1</span>
+                    <span class="step-title">雙擊執行安裝檔</span>
+                    <div class="step-content">
+                        <p>如果出現「Windows 已保護您的電腦」，點擊「其他資訊」→「仍要執行」</p>
+                    </div>
+                </div>
+
+                <div class="step-container">
+                    <span class="step-number">2</span>
+                    <span class="step-title">接受授權條款</span>
+                    <div class="step-content">
+                        <p>勾選 「I accept the MiKTeX licensing terms」→ Next</p>
+                    </div>
+                </div>
+
+                <div class="step-container">
+                    <span class="step-number">3</span>
+                    <span class="step-title">選擇安裝模式（重要！）</span>
+                    <div class="step-content">
+                        <p>選擇 <strong>「Install MiKTeX for anyone who uses this computer」</strong>（為所有使用者安裝）</p>
+                        <p>這樣可以避免權限問題。</p>
+                    </div>
+                </div>
+
+                <div class="step-container">
+                    <span class="step-number">4</span>
+                    <span class="step-title">設定套件安裝方式（重要！）</span>
+                    <div class="step-content">
+                        <p>「Install missing packages on-the-fly」選擇：<strong>「Yes」</strong></p>
+                        <p>這樣當遇到缺少的套件時，MiKTeX 會自動從網路下載安裝。</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 5: 安裝 MiKTeX Step 3 -->
+        <div class="slide">
+            <div class="content-card">
+                <h2>📦 Step 3：完成安裝與驗證</h2>
+
+                <div class="step-container">
+                    <span class="step-number">1</span>
+                    <span class="step-title">等待安裝完成</span>
+                    <div class="step-content">
+                        <p>安裝過程可能需要 5-10 分鐘，請耐心等待。</p>
+                    </div>
+                </div>
+
+                <div class="step-container">
+                    <span class="step-number">2</span>
+                    <span class="step-title">重新啟動命令提示字元</span>
+                    <div class="step-content">
+                        <p>安裝完成後，<strong>關閉</strong>所有的 CMD / PowerShell 視窗，然後重新開啟。</p>
+                        <p>（這是為了讓系統載入新的環境變數）</p>
+                    </div>
+                </div>
+
+                <div class="step-container">
+                    <span class="step-number">3</span>
+                    <span class="step-title">驗證安裝是否成功</span>
+                    <div class="step-content">
+                        <p>在命令提示字元輸入：</p>
+                        <pre><code>xelatex --version</code></pre>
+                        <p>如果看到版本資訊（例如 <code>XeTeX 3.141592653...</code>），表示安裝成功！</p>
+                    </div>
+                </div>
+
+                <div class="box success">
+                    <strong>✅ 恭喜！</strong>MiKTeX 安裝完成，現在可以開始轉換 PDF 了！
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 6: 第一次轉 PDF -->
+        <div class="slide">
+            <div class="content-card">
+                <h2>📄 第一次將 Markdown 轉成 PDF</h2>
+                <p>先來試試最基本的轉換指令：</p>
+
+                <pre><code>pandoc test.md -o test.pdf</code></pre>
+
+                <div class="box warning">
+                    <strong>⚠️ 第一次轉換會比較慢！</strong><br>
+                    MiKTeX 會自動下載需要的 LaTeX 套件，可能會出現多個彈出視窗詢問是否安裝套件。<br>
+                    <strong>請全部選擇「Install」！</strong>
+                </div>
+
+                <h3>可能遇到的問題</h3>
+                <p>如果你的 Markdown 檔案包含<strong>中文</strong>，打開 PDF 可能會發現：</p>
+                <ul>
+                    <li>中文字變成方框 □□□</li>
+                    <li>中文字完全消失</li>
+                    <li>出現亂碼</li>
+                </ul>
+
+                <div class="box danger">
+                    <strong>❌ 這是因為：</strong>預設的 pdflatex 引擎不支援 Unicode 中文字型！<br>
+                    我們需要改用 <strong>XeLaTeX</strong> 引擎。
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 7: 使用 XeLaTeX -->
+        <div class="slide">
+            <div class="content-card">
+                <h2>⚙️ 解決中文問題：使用 XeLaTeX 引擎</h2>
+                <p>XeLaTeX 是專門支援 Unicode 和系統字型的 LaTeX 引擎。</p>
+
+                <h3>指令格式</h3>
+                <pre><code>pandoc test.md -o test.pdf --pdf-engine=xelatex</code></pre>
+
+                <table class="comparison-table">
+                    <tr>
+                        <th>引擎</th>
+                        <th>中文支援</th>
+                        <th>系統字型</th>
+                        <th>建議使用</th>
+                    </tr>
+                    <tr>
+                        <td>pdflatex（預設）</td>
+                        <td class="bad">❌ 不支援</td>
+                        <td class="bad">❌ 不支援</td>
+                        <td>純英文文件</td>
+                    </tr>
+                    <tr>
+                        <td>xelatex</td>
+                        <td class="good">✅ 完整支援</td>
+                        <td class="good">✅ 支援</td>
+                        <td class="good"><strong>中文文件首選</strong></td>
+                    </tr>
+                    <tr>
+                        <td>lualatex</td>
+                        <td class="good">✅ 完整支援</td>
+                        <td class="good">✅ 支援</td>
+                        <td>進階排版</td>
+                    </tr>
+                </table>
+
+                <div class="box info">
+                    <strong>📌 記住：</strong>只要文件包含中文，永遠使用 <code>--pdf-engine=xelatex</code>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 8: 設定中文字型 -->
+        <div class="slide">
+            <div class="content-card">
+                <h2>🔤 設定中文字型（關鍵步驟！）</h2>
+                <p>即使用了 XeLaTeX，還需要<strong>明確指定中文字型</strong>，否則仍可能顯示不正常。</p>
+
+                <h3>完整指令</h3>
+                <pre><code>pandoc test.md -o test.pdf --pdf-engine=xelatex -V CJKmainfont="Microsoft JhengHei"</code></pre>
+
+                <h4>參數說明</h4>
+                <table>
+                    <tr>
+                        <th>參數</th>
+                        <th>說明</th>
+                    </tr>
+                    <tr>
+                        <td><code>--pdf-engine=xelatex</code></td>
+                        <td>使用 XeLaTeX 引擎</td>
+                    </tr>
+                    <tr>
+                        <td><code>-V CJKmainfont="字型名"</code></td>
+                        <td>設定 CJK（中日韓）主要字型</td>
+                    </tr>
+                </table>
+
+                <h4>Windows 常見中文字型</h4>
+                <ul>
+                    <li><code>Microsoft JhengHei</code> - 微軟正黑體（推薦！Windows 內建）</li>
+                    <li><code>PMingLiU</code> - 新細明體（Windows 內建）</li>
+                    <li><code>Noto Serif CJK TC</code> - 思源宋體（需另外安裝）</li>
+                    <li><code>Noto Sans CJK TC</code> - 思源黑體（需另外安裝）</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Slide 9: 推薦字型安裝 -->
+        <div class="slide">
+            <div class="content-card">
+                <h2>🎨 推薦字型：Noto Serif CJK TC（思源宋體）</h2>
+                <p>如果你想要更專業、更美觀的中文排版，建議安裝 Google 的 Noto 字型系列。</p>
+
+                <div class="step-container">
+                    <span class="step-number">1</span>
+                    <span class="step-title">下載 Noto Serif CJK TC</span>
+                    <div class="step-content">
+                        <p style="text-align: center; margin: 20px 0;">
+                            <a href="https://fonts.google.com/noto/specimen/Noto+Serif+TC" target="_blank" class="download-btn">
+                                🌐 前往 Google Fonts 下載
+                            </a>
+                        </p>
+                        <p>點擊右上角「Download family」按鈕下載字型壓縮檔。</p>
+                    </div>
+                </div>
+
+                <div class="step-container">
+                    <span class="step-number">2</span>
+                    <span class="step-title">安裝字型</span>
+                    <div class="step-content">
+                        <ol>
+                            <li>解壓縮下載的 ZIP 檔</li>
+                            <li>選取所有 <code>.ttf</code> 或 <code>.otf</code> 字型檔</li>
+                            <li>右鍵 → 「為所有使用者安裝」</li>
+                        </ol>
+                    </div>
+                </div>
+
+                <div class="step-container">
+                    <span class="step-number">3</span>
+                    <span class="step-title">使用新字型</span>
+                    <div class="step-content">
+                        <pre><code>pandoc test.md -o test.pdf --pdf-engine=xelatex -V CJKmainfont="Noto Serif TC"</code></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 10: 完整的 PDF 轉換指令 -->
+        <div class="slide">
+            <div class="content-card">
+                <h2>📋 完整的中文 PDF 轉換指令</h2>
+                <p>以下是最完整、最穩定的中文 PDF 轉換指令：</p>
+
+                <h3>基本版（Windows 內建字型）</h3>
+                <pre><code>pandoc input.md -o output.pdf --pdf-engine=xelatex -V CJKmainfont="Microsoft JhengHei"</code></pre>
+
+                <h3>進階版（更多自訂設定）</h3>
+                <pre><code>pandoc input.md -o output.pdf ^
+  --pdf-engine=xelatex ^
+  -V CJKmainfont="Microsoft JhengHei" ^
+  -V geometry:margin=2.5cm ^
+  -V fontsize=12pt</code></pre>
+
+                <table>
+                    <tr>
+                        <th>參數</th>
+                        <th>說明</th>
+                        <th>建議值</th>
+                    </tr>
+                    <tr>
+                        <td><code>geometry:margin</code></td>
+                        <td>頁面邊距</td>
+                        <td>2cm ~ 3cm</td>
+                    </tr>
+                    <tr>
+                        <td><code>fontsize</code></td>
+                        <td>字體大小</td>
+                        <td>11pt 或 12pt</td>
+                    </tr>
+                </table>
+
+                <div class="box tip">
+                    <strong>💡 小技巧：</strong>指令太長時，在 Windows CMD 中可用 <code>^</code> 符號換行（如上所示）
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 11: 使用 YAML 設定 -->
+        <div class="slide">
+            <div class="content-card">
+                <h2>📝 進階：在 Markdown 中使用 YAML 設定</h2>
+                <p>每次都要打這麼長的指令很麻煩？可以把設定寫在 Markdown 檔案開頭！</p>
+
+                <h3>範例：在 Markdown 開頭加入 YAML 區塊</h3>
+                <pre><code>---
+title: "我的文件標題"
+author: "作者名稱"
+date: "2025-01-01"
+CJKmainfont: "Microsoft JhengHei"
+geometry: margin=2.5cm
+fontsize: 12pt
+---
+
+# 第一章
+
+這是文件內容...</code></pre>
+
+                <h3>簡化後的轉換指令</h3>
+                <pre><code>pandoc input.md -o output.pdf --pdf-engine=xelatex</code></pre>
+
+                <div class="box success">
+                    <strong>✅ 優點：</strong>
+                    <ul>
+                        <li>設定跟著文件走，不會忘記</li>
+                        <li>指令變得非常簡短</li>
+                        <li>可以為不同文件設定不同樣式</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 12: 常見錯誤排解 -->
+        <div class="slide">
+            <div class="content-card">
+                <h2>❓ 常見錯誤與解決方法</h2>
+
+                <div class="step-container">
+                    <h4>錯誤 1：找不到字型</h4>
+                    <p style="color: #dc3545; font-family: monospace;">Font "XXX" not found</p>
+                    <div class="step-content">
+                        <p><strong>原因：</strong>指定的字型名稱不正確或未安裝</p>
+                        <p><strong>解決：</strong></p>
+                        <ol>
+                            <li>確認字型名稱拼寫正確（區分大小寫）</li>
+                            <li>在 Windows 設定 → 個人化 → 字型 中確認字型已安裝</li>
+                            <li>嘗試使用 Windows 內建字型如 <code>Microsoft JhengHei</code></li>
+                        </ol>
+                    </div>
+                </div>
+
+                <div class="step-container">
+                    <h4>錯誤 2：缺少 LaTeX 套件</h4>
+                    <p style="color: #dc3545; font-family: monospace;">! LaTeX Error: File `xxx.sty' not found.</p>
+                    <div class="step-content">
+                        <p><strong>解決：</strong>讓 MiKTeX 自動安裝套件</p>
+                        <ol>
+                            <li>開啟「MiKTeX Console」（從開始選單）</li>
+                            <li>Settings → General → 「Always install missing packages on-the-fly」</li>
+                            <li>重新執行 Pandoc 指令</li>
+                        </ol>
+                    </div>
+                </div>
+
+                <div class="step-container">
+                    <h4>錯誤 3：xelatex 找不到</h4>
+                    <p style="color: #dc3545; font-family: monospace;">xelatex not found</p>
+                    <div class="step-content">
+                        <p><strong>解決：</strong>重新啟動電腦，或手動將 MiKTeX 加入 PATH</p>
+                        <p>MiKTeX 預設路徑：<code>C:\Program Files\MiKTeX\miktex\bin\x64</code></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 13: 實作練習 -->
+        <div class="slide">
+            <div class="content-card">
+                <h2>✍️ 實作練習</h2>
+                <p>請完成以下練習，確保你已經掌握 PDF 轉換技巧：</p>
+
+                <div class="concept-grid">
+                    <div class="concept-card">
+                        <h3>練習 1：基本 PDF 輸出</h3>
+                        <ol>
+                            <li>建立一個包含中文的 Markdown 檔</li>
+                            <li>使用 XeLaTeX + 微軟正黑體轉換</li>
+                            <li>開啟 PDF 確認中文正常顯示</li>
+                        </ol>
+                    </div>
+                    <div class="concept-card">
+                        <h3>練習 2：YAML 設定</h3>
+                        <ol>
+                            <li>在 Markdown 開頭加入 YAML 區塊</li>
+                            <li>設定標題、作者、字型</li>
+                            <li>用簡短指令轉換並檢視結果</li>
+                        </ol>
+                    </div>
+                    <div class="concept-card">
+                        <h3>練習 3：自訂版面</h3>
+                        <ol>
+                            <li>嘗試調整邊距（geometry）</li>
+                            <li>嘗試調整字體大小（fontsize）</li>
+                            <li>比較不同設定的 PDF 效果</li>
+                        </ol>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 14: 總結 -->
+        <div class="slide">
+            <div class="content-card">
+                <h2>🎉 Part 3 總結</h2>
+                <p>恭喜！你已經學會如何將 Markdown 轉換成中文 PDF 了！</p>
+
+                <div class="concept-grid">
+                    <div class="concept-card">
+                        <h3>✅ 完成的步驟</h3>
+                        <ul>
+                            <li>安裝 MiKTeX LaTeX 發行版</li>
+                            <li>學會使用 XeLaTeX 引擎</li>
+                            <li>設定繁體中文字型</li>
+                            <li>使用 YAML 簡化設定</li>
+                        </ul>
+                    </div>
+                    <div class="concept-card">
+                        <h3>🔑 關鍵指令</h3>
+                        <pre style="font-size: 14px;"><code>pandoc input.md -o output.pdf \
+  --pdf-engine=xelatex \
+  -V CJKmainfont="Microsoft JhengHei"</code></pre>
+                    </div>
+                </div>
+
+                <div class="box info" style="margin-top: 30px;">
+                    <h3>📚 下一步：Part 4</h3>
+                    <p>學習進階功能：<strong>LaTeX 數學公式</strong>、<strong>圖片插入</strong>、<strong>Mermaid.js 圖表</strong>整合！<br>
+                    讓你的文件不只有文字，還能包含精美的公式和圖表。</p>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- 導航箭頭 -->
+    <button class="nav-arrow prev-arrow" id="prevBtn" onclick="changeSlide(-1)">❮</button>
+    <button class="nav-arrow next-arrow" id="nextBtn" onclick="changeSlide(1)">❯</button>
+
+    <!-- 頁碼指示器 -->
+    <div class="indicators" id="indicatorContainer"></div>
+
+    <script>
+        let currentSlide = 0;
+        const slides = document.querySelectorAll('.slide');
+        const totalSlides = slides.length;
+
+        function init() {
+            createIndicators();
+            showSlide(0);
+            updateButtons();
+            document.addEventListener('keydown', handleKeydown);
+        }
+
+        function handleKeydown(e) {
+            if (e.key === 'ArrowLeft') changeSlide(-1);
+            if (e.key === 'ArrowRight') changeSlide(1);
+        }
+
+        function createIndicators() {
+            const container = document.getElementById('indicatorContainer');
+            container.innerHTML = '';
+            slides.forEach((_, index) => {
+                const dot = document.createElement('div');
+                dot.className = 'dot';
+                dot.onclick = () => goToSlide(index);
+                container.appendChild(dot);
+            });
+        }
+
+        function showSlide(index) {
+            if (index < 0) index = 0;
+            if (index >= totalSlides) index = totalSlides - 1;
+
+            slides.forEach(slide => slide.classList.remove('active'));
+            slides[index].classList.add('active');
+            currentSlide = index;
+
+            const dots = document.querySelectorAll('.dot');
+            dots.forEach((dot, idx) => {
+                dot.classList.toggle('active', idx === index);
+            });
+
+            updateButtons();
+        }
+
+        function changeSlide(direction) {
+            showSlide(currentSlide + direction);
+        }
+
+        function goToSlide(index) {
+            showSlide(index);
+        }
+
+        function updateButtons() {
+            document.getElementById('prevBtn').disabled = currentSlide === 0;
+            document.getElementById('nextBtn').disabled = currentSlide === totalSlides - 1;
+        }
+
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen();
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                }
+            }
+        }
+
+        init();
+    </script>
+</body>
+</html>
