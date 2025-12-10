@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(git init:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\n初始化 Pandoc 教學專案\n\n包含完整的 Pandoc 文件轉換教學：\n- Part 1: 入門與安裝\n- Part 2: 基礎格式轉換 (Markdown/Word/HTML)\n- Part 3: PDF 輸出與中文字型設定\n- Part 4: 進階功能 (數學公式/圖片/Mermaid圖表)\n- Part 5: 自動化批次腳本\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(gh repo create:*)"
     ]
   }
 }
