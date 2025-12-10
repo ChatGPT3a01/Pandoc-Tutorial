@@ -2,6 +2,20 @@
 
 > 掌握「文件界的瑞士刀」，輕鬆實現 Markdown、Word、PDF、HTML 格式互轉
 
+## 線上瀏覽
+
+👉 **[點此開始學習](https://chatgpt3a01.github.io/Pandoc-Tutorial/Pandoc教學_統整頁.html)**
+
+| 單元 | 線上連結 |
+|:----:|----------|
+| 統整頁 | [開啟](https://chatgpt3a01.github.io/Pandoc-Tutorial/Pandoc教學_統整頁.html) |
+| Part 0 | [Markdown 基礎教學](https://chatgpt3a01.github.io/Pandoc-Tutorial/Pandoc教學_Part0_Markdown基礎.html) |
+| Part 1 | [Pandoc 入門與安裝](https://chatgpt3a01.github.io/Pandoc-Tutorial/Pandoc教學_Part1_入門與安裝.html) |
+| Part 2 | [基礎格式轉換實戰](https://chatgpt3a01.github.io/Pandoc-Tutorial/Pandoc教學_Part2_基礎格式轉換.html) |
+| Part 3 | [PDF 輸出與中文字型](https://chatgpt3a01.github.io/Pandoc-Tutorial/Pandoc教學_Part3_PDF與中文字型.html) |
+| Part 4 | [進階功能：公式與圖表](https://chatgpt3a01.github.io/Pandoc-Tutorial/Pandoc教學_Part4_進階功能.html) |
+| Part 5 | [自動化批次腳本](https://chatgpt3a01.github.io/Pandoc-Tutorial/Pandoc教學_Part5_自動化腳本.html) |
+
 ## 課程簡介
 
 Pandoc 是一款功能強大的「文件萬用轉換器」，能在不同格式之間轉換文件。本課程將帶你從零開始，完整掌握 Pandoc 的各種技巧。
